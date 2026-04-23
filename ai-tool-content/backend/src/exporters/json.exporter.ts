@@ -1,0 +1,38 @@
+import type { GeneratedAsset } from "@ai-tool-content/shared";
+import type { SerializedExport } from "./markdown.exporter.js";
+
+/**
+ * Serialize a GeneratedAsset to a structured JSON document suitable for a
+ * downstream publisher (CMS, static site, etc.).
+ */
+export function serializeJson(asset: GeneratedAsset): SerializedExport {
+  const slug = asset.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  const payload = {
+    id: asset.id,
+    type: asset.type,
+    title: asset.title,
+    slug: slug || asset.id,
+    status: asset.status,
+    body: asset.content,
+    metadata: asset.metadata ? safeParse(asset.metadata) : null,
+    createdAt: asset.createdAt.toISOString(),
+    updatedAt: asset.updatedAt.toISOString(),
+  };
+
+  return {
+    filename: `${slug || asset.id}.json`,
+    body: JSON.stringify(payload, null, 2),
+  };
+}
+
+function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return s;
+  }
+}

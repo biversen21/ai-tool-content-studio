@@ -1,0 +1,90 @@
+// Prisma schema — first pass, intentionally simple.
+//
+// Status fields are stored as strings and validated at the API edge by Zod
+// enums in `shared/src/constants/status.ts`. Single source of truth, and
+// avoids SQLite-specific friction with native enums.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tool {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String
+  websiteUrl   String?
+  category     String?
+  description  String?
+  affiliateUrl String?
+  status       String   @default("draft") // ToolStatus: draft | active | archived
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  researchRuns    ResearchRun[]
+  generatedAssets GeneratedAsset[]
+}
+
+model ResearchRun {
+  id          String    @id @default(cuid())
+  toolId      String
+  status      String    @default("pending") // ResearchStatus: pending | running | completed | failed
+  model       String?
+  notes       String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  tool  Tool           @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  facts ResearchFact[]
+
+  @@index([toolId])
+}
+
+model ResearchFact {
+  id            String   @id @default(cuid())
+  researchRunId String
+  category      String   // feature | pricing | pro | con | use_case | integration | other
+  content       String
+  sourceUrl     String?
+  confidence    Float?
+  createdAt     DateTime @default(now())
+
+  researchRun ResearchRun @relation(fields: [researchRunId], references: [id], onDelete: Cascade)
+
+  @@index([researchRunId])
+}
+
+model GeneratedAsset {
+  id        String   @id @default(cuid())
+  toolId    String
+  type      String   // article | summary | listicle | comparison | review | category_page
+  title     String
+  content   String   // markdown body
+  metadata  String?  // JSON-encoded blob (frontmatter, SEO, etc.)
+  model     String?
+  status    String   @default("draft") // AssetStatus: draft | ready | archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tool            Tool             @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  publishPayloads PublishPayload[]
+
+  @@index([toolId])
+}
+
+model PublishPayload {
+  id               String   @id @default(cuid())
+  generatedAssetId String
+  format           String   // json | markdown
+  filePath         String   // path under exports/, relative to repo root
+  status           String   @default("draft") // PublishStatus: draft | exported | published | failed
+  createdAt        DateTime @default(now())
+
+  generatedAsset GeneratedAsset @relation(fields: [generatedAssetId], references: [id], onDelete: Cascade)
+
+  @@index([generatedAssetId])
+}
