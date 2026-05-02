@@ -16,14 +16,9 @@ export class LocalExportAdapter implements Publisher {
 
   async write(input: PublishInput): Promise<PublishResult> {
     const subdir = input.format === "json" ? "json" : "markdown";
-    const dir = path.resolve(process.cwd(), this.rootDir, subdir);
-    await fs.mkdir(dir, { recursive: true });
-
-    const filePath = path.join(dir, input.filename);
-    await fs.writeFile(filePath, input.body, "utf8");
-
-    // Return path relative to repo root for storage in PublishPayload.filePath
-    const rel = path.relative(process.cwd(), filePath);
-    return { filePath: rel };
+    const fullPath = path.resolve(process.cwd(), this.rootDir, subdir, input.filename);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, input.body, "utf8");
+    return { filePath: path.relative(process.cwd(), fullPath) };
   }
 }

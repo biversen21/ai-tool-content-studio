@@ -6,16 +6,11 @@ import type { SerializedExport } from "./markdown.exporter.js";
  * downstream publisher (CMS, static site, etc.).
  */
 export function serializeJson(asset: GeneratedAsset): SerializedExport {
-  const slug = asset.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
   const payload = {
     id: asset.id,
     type: asset.type,
     title: asset.title,
-    slug: slug || asset.id,
+    slug: asset.slug,
     status: asset.status,
     body: asset.contentMarkdown ?? "",
     metadata: safeParse(asset.contentJson),
@@ -24,7 +19,7 @@ export function serializeJson(asset: GeneratedAsset): SerializedExport {
   };
 
   return {
-    filename: `${slug || asset.id}.json`,
+    filename: `${asset.type}/${asset.slug}.json`,
     body: JSON.stringify(payload, null, 2),
   };
 }

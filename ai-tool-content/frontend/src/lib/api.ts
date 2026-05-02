@@ -115,3 +115,38 @@ export const generateComparisonPage = (toolId: string) =>
   apiPost<{ asset: GeneratedAsset }>(`/api/tools/${toolId}/generate/comparison-page`, {});
 export const generateAll = (toolId: string) =>
   apiPost<{ assets: GeneratedAsset[] }>(`/api/tools/${toolId}/generate/all`, {});
+export const updateAsset = (id: string, body: { title?: string; slug?: string; contentJson?: string; contentMarkdown?: string | null; status?: string }) =>
+  apiPatch<{ asset: GeneratedAsset }>(`/api/assets/${id}`, body);
+export const approveAsset = (id: string) =>
+  apiPost<{ asset: GeneratedAsset }>(`/api/assets/${id}/approve`, {});
+
+export interface SerializedExport {
+  filename: string;
+  body: string;
+}
+
+export interface PreviewResult {
+  json: SerializedExport;
+  markdown: SerializedExport;
+}
+
+export interface PublishPayload {
+  id: string;
+  generatedAssetId: string;
+  payloadType: string;
+  payloadJson: string;
+  payloadMarkdown: string | null;
+  format: string;
+  filePath: string;
+  status: string;
+  createdAt: string;
+}
+
+export const publishPreview = (id: string) =>
+  apiPost<PreviewResult>(`/api/assets/${id}/publish-preview`, {});
+export const exportJson = (id: string) =>
+  apiPost<{ payload: PublishPayload }>(`/api/assets/${id}/export-json`, {});
+export const exportMarkdown = (id: string) =>
+  apiPost<{ payload: PublishPayload }>(`/api/assets/${id}/export-markdown`, {});
+export const getPayloads = (assetId: string) =>
+  apiGet<{ payloads: PublishPayload[] }>(`/api/assets/${assetId}/payloads`);

@@ -10,15 +10,21 @@ export interface SerializedExport {
  * Kept minimal — the publish service composes this with a Publisher adapter.
  */
 export function serializeMarkdown(asset: GeneratedAsset): SerializedExport {
-  const slug = asset.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const parsed = (() => {
+    try { return JSON.parse(asset.contentJson) as Record<string, unknown>; }
+    catch { return null; }
+  })();
+
+  const seoTitle = (parsed?.seoTitle as string | undefined) ?? asset.title;
+  const metaDescription = (parsed?.metaDescription as string | undefined) ?? "";
 
   const frontmatter = [
     "---",
     `title: ${JSON.stringify(asset.title)}`,
+    `seoTitle: ${JSON.stringify(seoTitle)}`,
+    `metaDescription: ${JSON.stringify(metaDescription)}`,
     `type: ${asset.type}`,
+    `slug: ${asset.slug}`,
     `status: ${asset.status}`,
     `createdAt: ${asset.createdAt.toISOString()}`,
     "---",
@@ -26,7 +32,7 @@ export function serializeMarkdown(asset: GeneratedAsset): SerializedExport {
   ].join("\n");
 
   return {
-    filename: `${slug || asset.id}.md`,
+    filename: `${asset.type}/${asset.slug}.md`,
     body: frontmatter + (asset.contentMarkdown ?? ""),
   };
 }

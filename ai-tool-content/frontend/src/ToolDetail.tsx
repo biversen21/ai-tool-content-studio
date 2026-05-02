@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
   getTool, getLatestResearch, runResearch, getAssets,
   generateToolPage, generateCategoryPage, generateComparisonPage, generateAll,
+  updateAsset, approveAsset, publishPreview, exportJson, exportMarkdown, getPayloads,
   type Tool, type ResearchRun, type ResearchFact, type GeneratedAsset,
+  type PreviewResult, type PublishPayload,
 } from "./lib/api.js";
 import { StatusBadge } from "./ui.js";
 
@@ -77,7 +79,7 @@ export function ToolDetail({ toolId, onBack }: Props) {
             {tab === "overview"  && <OverviewTab tool={tool} />}
             {tab === "research"  && <ResearchTab toolId={tool.id} />}
             {tab === "generated" && <GeneratedContentTab toolId={tool.id} />}
-            {tab === "publish"   && <Placeholder>Publish preview will appear here once the publish feature is implemented.</Placeholder>}
+            {tab === "publish"   && <PublishPreviewTab toolId={tool.id} />}
           </>
         )}
 
@@ -176,7 +178,9 @@ function GeneratedContentTab({ toolId }: { toolId: string }) {
       )}
       {assets.length > 0 && (
         <div className="space-y-3">
-          {assets.map((asset) => <AssetCard key={asset.id} asset={asset} />)}
+          {assets.map((asset) => (
+            <AssetCard key={asset.id} asset={asset} onUpdate={load} />
+          ))}
         </div>
       )}
     </div>
@@ -185,39 +189,189 @@ function GeneratedContentTab({ toolId }: { toolId: string }) {
 
 type PreviewMode = "markdown" | "json";
 
-function AssetCard({ asset }: { asset: GeneratedAsset }) {
+interface AssetCardProps {
+  asset: GeneratedAsset;
+  onUpdate: () => void;
+}
+
+function AssetCard({ asset, onUpdate }: AssetCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<PreviewMode>("markdown");
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(asset.title);
+  const [editMarkdown, setEditMarkdown] = useState(asset.contentMarkdown ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState("");
+  const [exporting, setExporting] = useState<"json" | "markdown" | null>(null);
+  const [exportResult, setExportResult] = useState<string | null>(null);
+  const [exportError, setExportError] = useState("");
 
   const parsedJson = (() => {
     try { return JSON.parse(asset.contentJson) as Record<string, unknown>; }
     catch { return null; }
   })();
 
+  function startEdit() {
+    setEditTitle(asset.title);
+    setEditMarkdown(asset.contentMarkdown ?? "");
+    setSaveError("");
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateAsset(asset.id, { title: editTitle, contentMarkdown: editMarkdown });
+      setEditing(false);
+      onUpdate();
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleApprove() {
+    setApproving(true);
+    setApproveError("");
+    try {
+      await approveAsset(asset.id);
+      onUpdate();
+    } catch (e) {
+      setApproveError(e instanceof Error ? e.message : "Approve failed");
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleExport(format: "json" | "markdown") {
+    setExporting(format);
+    setExportError("");
+    setExportResult(null);
+    try {
+      const fn = format === "json" ? exportJson : exportMarkdown;
+      const { payload } = await fn(asset.id);
+      setExportResult(payload.filePath);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
       {/* Header row */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
-              {ASSET_TYPE_LABELS[asset.type] ?? asset.type}
-            </span>
-            <span className="font-medium text-slate-900 truncate">{asset.title}</span>
+      <div className="px-5 py-4">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full text-left"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+                {ASSET_TYPE_LABELS[asset.type] ?? asset.type}
+              </span>
+              <span className="font-medium text-slate-900 truncate">{asset.title}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <StatusBadge status={asset.status} />
+              <span className="text-slate-400 text-sm">{expanded ? "▲" : "▼"}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge status={asset.status} />
-            <span className="text-slate-400 text-sm">{expanded ? "▲" : "▼"}</span>
+          <p className="text-xs text-slate-400 mt-0.5 font-mono">{asset.slug}</p>
+        </button>
+
+        {/* Action buttons row */}
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {!editing && (
+            <button
+              onClick={startEdit}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
+            >
+              Edit
+            </button>
+          )}
+          {asset.status !== "approved" && (
+            <button
+              onClick={handleApprove}
+              disabled={approving}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 disabled:opacity-50 transition-colors"
+            >
+              {approving ? "Approving…" : "Approve"}
+            </button>
+          )}
+          <button
+            onClick={() => handleExport("json")}
+            disabled={exporting !== null}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors"
+          >
+            {exporting === "json" ? "Exporting…" : "Export JSON"}
+          </button>
+          <button
+            onClick={() => handleExport("markdown")}
+            disabled={exporting !== null}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors"
+          >
+            {exporting === "markdown" ? "Exporting…" : "Export MD"}
+          </button>
+        </div>
+
+        {approveError && <p className="text-xs text-red-600 mt-2">{approveError}</p>}
+        {exportError  && <p className="text-xs text-red-600 mt-2">{exportError}</p>}
+        {exportResult && (
+          <p className="text-xs text-green-700 mt-2 font-mono">
+            Exported → {exportResult}
+          </p>
+        )}
+      </div>
+
+      {/* Inline edit form */}
+      {editing && (
+        <div className="border-t border-slate-100 px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Title</label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Markdown</label>
+            <textarea
+              value={editMarkdown}
+              onChange={(e) => setEditMarkdown(e.target.value)}
+              rows={12}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+            />
+          </div>
+          {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
-        <p className="text-xs text-slate-400 mt-0.5 font-mono">{asset.slug}</p>
-      </button>
+      )}
 
       {/* Expanded preview */}
-      {expanded && (
+      {expanded && !editing && (
         <div className="border-t border-slate-100">
           {/* Mode toggle */}
           <div className="flex gap-1 px-5 pt-3">
@@ -246,6 +400,143 @@ function AssetCard({ asset }: { asset: GeneratedAsset }) {
               {JSON.stringify(parsedJson, null, 2)}
             </pre>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Publish Preview tab ----
+
+function PublishPreviewTab({ toolId }: { toolId: string }) {
+  const [assets, setAssets] = useState<GeneratedAsset[]>([]);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    setLoadStatus("loading");
+    getAssets(toolId)
+      .then(({ assets }) => { setAssets(assets); setLoadStatus("ok"); })
+      .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load"); setLoadStatus("error"); });
+  }, [toolId]);
+
+  if (loadStatus === "loading") return <p className="text-sm text-slate-500">Loading…</p>;
+  if (loadStatus === "error")   return <p className="text-sm text-red-600">{loadError}</p>;
+
+  if (assets.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl px-5 py-10 text-center">
+        <p className="text-sm text-slate-400">No assets yet. Generate content first.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {assets.map((asset) => <PublishAssetCard key={asset.id} asset={asset} />)}
+    </div>
+  );
+}
+
+function PublishAssetCard({ asset }: { asset: GeneratedAsset }) {
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [previewMode, setPreviewMode] = useState<"json" | "markdown">("markdown");
+  const [payloads, setPayloads] = useState<PublishPayload[]>([]);
+  const [payloadsLoaded, setPayloadsLoaded] = useState(false);
+
+  async function handlePreview() {
+    setPreviewing(true);
+    setPreviewError("");
+    try {
+      const result = await publishPreview(asset.id);
+      setPreview(result);
+    } catch (e) {
+      setPreviewError(e instanceof Error ? e.message : "Preview failed");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  async function loadPayloads() {
+    try {
+      const { payloads } = await getPayloads(asset.id);
+      setPayloads(payloads);
+      setPayloadsLoaded(true);
+    } catch { /* non-critical */ }
+  }
+
+  useEffect(() => { void loadPayloads(); }, [asset.id]);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+              {ASSET_TYPE_LABELS[asset.type] ?? asset.type}
+            </span>
+            <StatusBadge status={asset.status} />
+          </div>
+          <p className="font-medium text-slate-900 truncate">{asset.title}</p>
+          <p className="text-xs text-slate-400 font-mono mt-0.5">{asset.slug}</p>
+        </div>
+        <button
+          onClick={handlePreview}
+          disabled={previewing}
+          className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors"
+        >
+          {previewing ? "Loading…" : preview ? "Refresh Preview" : "Preview"}
+        </button>
+      </div>
+
+      {previewError && <p className="text-xs text-red-600 px-5 pb-3">{previewError}</p>}
+
+      {/* Preview pane */}
+      {preview && (
+        <div className="border-t border-slate-100">
+          <div className="flex gap-1 px-5 pt-3 pb-2">
+            {(["markdown", "json"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setPreviewMode(m)}
+                className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+                  previewMode === m
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {m === "markdown" ? "Markdown" : "JSON"}
+              </button>
+            ))}
+            <span className="ml-auto text-xs text-slate-400 self-center">
+              {previewMode === "markdown" ? preview.markdown.filename : preview.json.filename}
+            </span>
+          </div>
+          <pre className="px-5 py-3 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-[400px] overflow-y-auto border-t border-slate-50">
+            {previewMode === "markdown" ? preview.markdown.body : preview.json.body}
+          </pre>
+        </div>
+      )}
+
+      {/* Export history */}
+      {payloadsLoaded && payloads.length > 0 && (
+        <div className="border-t border-slate-100 px-5 py-3">
+          <p className="text-xs font-medium text-slate-500 mb-2">Exports</p>
+          <ul className="space-y-1">
+            {payloads.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 text-xs text-slate-600">
+                <span className="font-medium uppercase bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{p.format}</span>
+                <span className="font-mono text-slate-500 truncate">{p.filePath}</span>
+                <StatusBadge status={p.status} />
+                <span className="shrink-0 text-slate-400 ml-auto">
+                  {new Date(p.createdAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -436,14 +727,4 @@ function fmt(iso: string) {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-// ---- Placeholder ----
-
-function Placeholder({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl px-5 py-10 text-center">
-      <p className="text-sm text-slate-400">{children}</p>
-    </div>
-  );
 }

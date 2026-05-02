@@ -4,8 +4,11 @@ import { PublishFormat, PublishStatus } from "../constants/status.js";
 export const PublishPayloadSchema = z.object({
   id: z.string().cuid(),
   generatedAssetId: z.string().cuid(),
-  format: PublishFormat,
-  filePath: z.string().min(1), // relative to repo root, e.g. "exports/markdown/foo.md"
+  payloadType: z.string(),               // asset type: tool_page | category_page | comparison_page
+  payloadJson: z.string(),               // serialized JSON export body
+  payloadMarkdown: z.string().nullable().optional(),
+  format: PublishFormat,                 // which format was written to disk
+  filePath: z.string().min(1),           // relative to repo root, e.g. "exports/json/tool_page/foo.json"
   status: PublishStatus.default("draft"),
   createdAt: z.coerce.date(),
 });
