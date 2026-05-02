@@ -15,22 +15,27 @@ export const ToolSchema = z.object({
   category: z.string().max(120).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
   affiliateUrl: z.string().url().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
   status: ToolStatus.default("draft"),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
 
-export const CreateToolInput = ToolSchema.pick({
-  slug: true,
-  name: true,
-  websiteUrl: true,
-  category: true,
-  description: true,
-  affiliateUrl: true,
-  status: true,
-}).partial({ websiteUrl: true, category: true, description: true, affiliateUrl: true, status: true });
+// POST /api/tools — slug is auto-generated from name
+export const CreateToolInput = z.object({
+  name: z.string().min(1).max(200),
+  affiliateUrl: z.string().url().optional(),
+  notes: z.string().max(2000).optional(),
+});
 
-export const UpdateToolInput = CreateToolInput.partial();
+// PATCH /api/tools/:id — all fields optional; slug can be overridden manually
+export const UpdateToolInput = z.object({
+  name: z.string().min(1).max(200).optional(),
+  slug: slugSchema.optional(),
+  affiliateUrl: z.string().url().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  status: ToolStatus.optional(),
+});
 
 export type Tool = z.infer<typeof ToolSchema>;
 export type CreateToolInput = z.infer<typeof CreateToolInput>;

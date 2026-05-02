@@ -21,6 +21,7 @@ model Tool {
   category     String?
   description  String?
   affiliateUrl String?
+  notes        String?
   status       String   @default("draft") // ToolStatus: draft | researched | generated | approved | archived
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
