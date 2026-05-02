@@ -1,19 +1,10 @@
-import type {
-  CreatePublishPayloadInput,
-  PublishPayload,
-} from "@ai-tool-content/shared";
+import type { PublishPayload } from "@ai-tool-content/shared";
 import { prisma } from "../db/client.js";
 import { LocalExportAdapter } from "../adapters/publisher/localExport.adapter.js";
-import type { Publisher } from "../adapters/publisher/publisher.interface.js";
+import { serializeJson } from "../exporters/json.exporter.js";
+import { serializeMarkdown, type SerializedExport } from "../exporters/markdown.exporter.js";
 
-/**
- * Publish service — owns the export contract.
- * Picks the right exporter for the requested format, writes via the configured
- * Publisher adapter, and records the resulting PublishPayload row.
- */
-
-// For now: only local export. Later this can be selected by config or per-call.
-const publisher: Publisher = new LocalExportAdapter();
+const publisher = new LocalExportAdapter();
 
 export async function listPayloads(assetId?: string): Promise<PublishPayload[]> {
   const rows = await prisma.publishPayload.findMany({
@@ -23,12 +14,39 @@ export async function listPayloads(assetId?: string): Promise<PublishPayload[]> 
   return rows as unknown as PublishPayload[];
 }
 
-export async function publishAsset(_input: CreatePublishPayloadInput): Promise<PublishPayload> {
-  // TODO:
-  // 1. load GeneratedAsset
-  // 2. exporter = format === "markdown" ? markdownExporter : jsonExporter
-  // 3. const { filePath } = await publisher.write(exporter.serialize(asset))
-  // 4. persist PublishPayload row, status = "exported"
-  void publisher;
-  throw new Error("publishAsset not implemented");
+export interface PreviewResult {
+  json: SerializedExport;
+  markdown: SerializedExport;
+}
+
+export async function previewPayload(assetId: string): Promise<PreviewResult> {
+  const asset = await prisma.generatedAsset.findUnique({ where: { id: assetId } });
+  if (!asset) throw new Error(`Asset ${assetId} not found`);
+  const a = asset as unknown as Parameters<typeof serializeJson>[0];
+  return { json: serializeJson(a), markdown: serializeMarkdown(a) };
+}
+
+export async function exportAsset(assetId: string, format: "json" | "markdown"): Promise<PublishPayload> {
+  const asset = await prisma.generatedAsset.findUnique({ where: { id: assetId } });
+  if (!asset) throw new Error(`Asset ${assetId} not found`);
+
+  const a = asset as unknown as Parameters<typeof serializeJson>[0];
+  const jsonExport = serializeJson(a);
+  const mdExport = serializeMarkdown(a);
+
+  const target = format === "json" ? jsonExport : mdExport;
+  const { filePath } = await publisher.write({ filename: target.filename, format, body: target.body });
+
+  const row = await prisma.publishPayload.create({
+    data: {
+      generatedAssetId: assetId,
+      payloadType: asset.type,
+      payloadJson: jsonExport.body,
+      payloadMarkdown: mdExport.body,
+      format,
+      filePath,
+      status: "exported",
+    },
+  });
+  return row as unknown as PublishPayload;
 }

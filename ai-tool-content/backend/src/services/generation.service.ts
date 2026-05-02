@@ -1,4 +1,4 @@
-import type { GeneratedAsset } from "@ai-tool-content/shared";
+import type { GeneratedAsset, PatchAssetInput } from "@ai-tool-content/shared";
 import { prisma } from "../db/client.js";
 import { env } from "../env.js";
 import { completeJson } from "./openai.service.js";
@@ -22,6 +22,21 @@ export async function listAssets(toolId?: string): Promise<GeneratedAsset[]> {
 export async function getAsset(id: string): Promise<GeneratedAsset | null> {
   const row = await prisma.generatedAsset.findUnique({ where: { id } });
   return (row as unknown as GeneratedAsset) ?? null;
+}
+
+export async function updateAsset(id: string, input: PatchAssetInput): Promise<GeneratedAsset | null> {
+  const exists = await prisma.generatedAsset.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) return null;
+  const row = await prisma.generatedAsset.update({ where: { id }, data: input });
+  return row as unknown as GeneratedAsset;
+}
+
+export async function approveAsset(id: string): Promise<GeneratedAsset | null> {
+  const asset = await prisma.generatedAsset.findUnique({ where: { id } });
+  if (!asset) return null;
+  const row = await prisma.generatedAsset.update({ where: { id }, data: { status: "approved" } });
+  await prisma.tool.update({ where: { id: asset.toolId }, data: { status: "approved" } });
+  return row as unknown as GeneratedAsset;
 }
 
 // ---- Generation entry points ----

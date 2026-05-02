@@ -28,6 +28,15 @@ export const CreateGeneratedAssetInput = GeneratedAssetSchema.pick({
 
 export const UpdateGeneratedAssetInput = CreateGeneratedAssetInput.partial();
 
+export const PatchAssetInput = z.object({
+  title: z.string().min(1).max(300).optional(),
+  slug: z.string().min(1).max(200).optional(),
+  contentJson: z.string().min(1).optional(),
+  contentMarkdown: z.string().nullable().optional(),
+  status: AssetStatus.optional(),
+});
+
 export type GeneratedAsset = z.infer<typeof GeneratedAssetSchema>;
 export type CreateGeneratedAssetInput = z.infer<typeof CreateGeneratedAssetInput>;
 export type UpdateGeneratedAssetInput = z.infer<typeof UpdateGeneratedAssetInput>;
+export type PatchAssetInput = z.infer<typeof PatchAssetInput>;
