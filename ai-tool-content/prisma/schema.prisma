@@ -21,7 +21,8 @@ model Tool {
   category     String?
   description  String?
   affiliateUrl String?
-  status       String   @default("draft") // ToolStatus: draft | active | archived
+  notes        String?
+  status       String   @default("draft") // ToolStatus: draft | researched | generated | approved | archived
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -47,7 +48,7 @@ model ResearchRun {
 model ResearchFact {
   id            String   @id @default(cuid())
   researchRunId String
-  category      String   // feature | pricing | pro | con | use_case | integration | other
+  category      String   // feature | pricing | use_case | audience | integration | competitor | claim | other
   content       String
   sourceUrl     String?
   confidence    Float?
@@ -59,16 +60,17 @@ model ResearchFact {
 }
 
 model GeneratedAsset {
-  id        String   @id @default(cuid())
-  toolId    String
-  type      String   // article | summary | listicle | comparison | review | category_page
-  title     String
-  content   String   // markdown body
-  metadata  String?  // JSON-encoded blob (frontmatter, SEO, etc.)
-  model     String?
-  status    String   @default("draft") // AssetStatus: draft | ready | archived
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  toolId          String
+  type            String   // tool_page | category_page | comparison_page
+  slug            String
+  title           String
+  contentJson     String
+  contentMarkdown String?
+  model           String?
+  status          String   @default("draft") // AssetStatus: draft | generated | approved | archived
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tool            Tool             @relation(fields: [toolId], references: [id], onDelete: Cascade)
   publishPayloads PublishPayload[]
@@ -79,6 +81,9 @@ model GeneratedAsset {
 model PublishPayload {
   id               String   @id @default(cuid())
   generatedAssetId String
+  payloadType      String
+  payloadJson      String
+  payloadMarkdown  String?
   format           String   // json | markdown
   filePath         String   // path under exports/, relative to repo root
   status           String   @default("draft") // PublishStatus: draft | exported | published | failed
