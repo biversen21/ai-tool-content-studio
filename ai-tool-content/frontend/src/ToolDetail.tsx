@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { getTool, getLatestResearch, runResearch, type Tool, type ResearchRun, type ResearchFact } from "./lib/api.js";
+import {
+  getTool, getLatestResearch, runResearch, getAssets,
+  generateToolPage, generateCategoryPage, generateComparisonPage, generateAll,
+  type Tool, type ResearchRun, type ResearchFact, type GeneratedAsset,
+} from "./lib/api.js";
 import { StatusBadge } from "./ui.js";
 
 type Tab = "overview" | "research" | "generated" | "publish";
@@ -72,13 +76,179 @@ export function ToolDetail({ toolId, onBack }: Props) {
 
             {tab === "overview"  && <OverviewTab tool={tool} />}
             {tab === "research"  && <ResearchTab toolId={tool.id} />}
-            {tab === "generated" && <Placeholder>Generated content will appear here once the generation feature is implemented.</Placeholder>}
+            {tab === "generated" && <GeneratedContentTab toolId={tool.id} />}
             {tab === "publish"   && <Placeholder>Publish preview will appear here once the publish feature is implemented.</Placeholder>}
           </>
         )}
 
       </div>
     </main>
+  );
+}
+
+// ---- Generated Content tab ----
+
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  tool_page:       "Tool Page",
+  category_page:   "Category Page",
+  comparison_page: "Comparison Page",
+};
+
+type GenAction = "tool-page" | "category-page" | "comparison-page" | "all";
+
+function GeneratedContentTab({ toolId }: { toolId: string }) {
+  const [assets, setAssets] = useState<GeneratedAsset[]>([]);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [generating, setGenerating] = useState<GenAction | null>(null);
+  const [genError, setGenError] = useState("");
+
+  const load = () => {
+    setLoadStatus("loading");
+    getAssets(toolId)
+      .then(({ assets }) => { setAssets(assets); setLoadStatus("ok"); })
+      .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load"); setLoadStatus("error"); });
+  };
+
+  useEffect(load, [toolId]);
+
+  async function handleGenerate(action: GenAction) {
+    setGenerating(action);
+    setGenError("");
+    try {
+      if (action === "all") {
+        await generateAll(toolId);
+      } else if (action === "tool-page") {
+        await generateToolPage(toolId);
+      } else if (action === "category-page") {
+        await generateCategoryPage(toolId);
+      } else {
+        await generateComparisonPage(toolId);
+      }
+      load();
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  const busy = generating !== null;
+
+  if (loadStatus === "loading") return <p className="text-sm text-slate-500">Loading…</p>;
+  if (loadStatus === "error")   return <p className="text-sm text-red-600">{loadError}</p>;
+
+  return (
+    <div className="space-y-5">
+      {/* Action buttons */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Generate</p>
+        <div className="flex flex-wrap gap-2">
+          {(["tool-page", "category-page", "comparison-page"] as GenAction[]).map((action) => (
+            <button
+              key={action}
+              onClick={() => handleGenerate(action)}
+              disabled={busy}
+              className="bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {generating === action ? "Generating…" : `Generate ${ASSET_TYPE_LABELS[action.replace("-", "_")]}`}
+            </button>
+          ))}
+          <button
+            onClick={() => handleGenerate("all")}
+            disabled={busy}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {generating === "all" ? "Generating all…" : "Generate All"}
+          </button>
+        </div>
+        {busy && (
+          <p className="text-xs text-blue-600">Generating — this may take 20–40 seconds per asset…</p>
+        )}
+        {genError && <p className="text-sm text-red-600">{genError}</p>}
+      </div>
+
+      {/* Asset list */}
+      {assets.length === 0 && !busy && (
+        <div className="bg-white border border-slate-200 rounded-xl px-5 py-10 text-center">
+          <p className="text-sm text-slate-400">No assets yet. Click a Generate button above.</p>
+        </div>
+      )}
+      {assets.length > 0 && (
+        <div className="space-y-3">
+          {assets.map((asset) => <AssetCard key={asset.id} asset={asset} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type PreviewMode = "markdown" | "json";
+
+function AssetCard({ asset }: { asset: GeneratedAsset }) {
+  const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<PreviewMode>("markdown");
+
+  const parsedJson = (() => {
+    try { return JSON.parse(asset.contentJson) as Record<string, unknown>; }
+    catch { return null; }
+  })();
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      {/* Header row */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+              {ASSET_TYPE_LABELS[asset.type] ?? asset.type}
+            </span>
+            <span className="font-medium text-slate-900 truncate">{asset.title}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <StatusBadge status={asset.status} />
+            <span className="text-slate-400 text-sm">{expanded ? "▲" : "▼"}</span>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400 mt-0.5 font-mono">{asset.slug}</p>
+      </button>
+
+      {/* Expanded preview */}
+      {expanded && (
+        <div className="border-t border-slate-100">
+          {/* Mode toggle */}
+          <div className="flex gap-1 px-5 pt-3">
+            {(["markdown", "json"] as PreviewMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+                  mode === m
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {m === "markdown" ? "Markdown" : "JSON"}
+              </button>
+            ))}
+          </div>
+
+          {mode === "markdown" && (
+            <pre className="px-5 py-4 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-[600px] overflow-y-auto">
+              {asset.contentMarkdown ?? "(no markdown)"}
+            </pre>
+          )}
+          {mode === "json" && parsedJson && (
+            <pre className="px-5 py-4 text-xs text-slate-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-[600px] overflow-y-auto">
+              {JSON.stringify(parsedJson, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

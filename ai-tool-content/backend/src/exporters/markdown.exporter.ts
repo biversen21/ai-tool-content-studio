@@ -27,6 +27,6 @@ export function serializeMarkdown(asset: GeneratedAsset): SerializedExport {
 
   return {
     filename: `${slug || asset.id}.md`,
-    body: frontmatter + asset.content,
+    body: frontmatter + (asset.contentMarkdown ?? ""),
   };
 }

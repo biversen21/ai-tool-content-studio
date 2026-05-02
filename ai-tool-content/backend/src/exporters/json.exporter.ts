@@ -17,8 +17,8 @@ export function serializeJson(asset: GeneratedAsset): SerializedExport {
     title: asset.title,
     slug: slug || asset.id,
     status: asset.status,
-    body: asset.content,
-    metadata: asset.metadata ? safeParse(asset.metadata) : null,
+    body: asset.contentMarkdown ?? "",
+    metadata: safeParse(asset.contentJson),
     createdAt: asset.createdAt.toISOString(),
     updatedAt: asset.updatedAt.toISOString(),
   };
