@@ -8,9 +8,9 @@ import { z } from "zod";
  * status field — services, routes, frontend — should import from this module.
  */
 
-export const TOOL_STATUS = ["draft", "active", "archived"] as const;
+export const TOOL_STATUS = ["draft", "researched", "generated", "approved", "archived"] as const;
 export const RESEARCH_STATUS = ["pending", "running", "completed", "failed"] as const;
-export const ASSET_STATUS = ["draft", "ready", "archived"] as const;
+export const ASSET_STATUS = ["draft", "generated", "approved", "archived"] as const;
 export const PUBLISH_STATUS = ["draft", "exported", "published", "failed"] as const;
 
 export const ToolStatus = z.enum(TOOL_STATUS);
@@ -23,16 +23,14 @@ export type ResearchStatus = z.infer<typeof ResearchStatus>;
 export type AssetStatus = z.infer<typeof AssetStatus>;
 export type PublishStatus = z.infer<typeof PublishStatus>;
 
-// Convenience: categories used on ResearchFact and asset types on
-// GeneratedAsset are also string-typed in the DB, so we keep them here.
-
 export const RESEARCH_FACT_CATEGORY = [
   "feature",
   "pricing",
-  "pro",
-  "con",
   "use_case",
+  "audience",
   "integration",
+  "competitor",
+  "claim",
   "other",
 ] as const;
 
@@ -40,12 +38,9 @@ export const ResearchFactCategory = z.enum(RESEARCH_FACT_CATEGORY);
 export type ResearchFactCategory = z.infer<typeof ResearchFactCategory>;
 
 export const ASSET_TYPE = [
-  "article",
-  "summary",
-  "listicle",
-  "comparison",
-  "review",
+  "tool_page",
   "category_page",
+  "comparison_page",
 ] as const;
 
 export const AssetType = z.enum(ASSET_TYPE);
