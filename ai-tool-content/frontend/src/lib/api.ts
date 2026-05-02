@@ -88,3 +88,30 @@ export const runResearch = (toolId: string, notes?: string) =>
   apiPost<{ run: ResearchRun }>(`/api/tools/${toolId}/research`, { notes });
 export const getLatestResearch = (toolId: string) =>
   apiGet<{ run: ResearchRun | null }>(`/api/tools/${toolId}/research`);
+
+export interface GeneratedAsset {
+  id: string;
+  toolId: string;
+  type: string;
+  slug: string;
+  title: string;
+  contentJson: string;
+  contentMarkdown: string | null;
+  model: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getAssets = (toolId: string) =>
+  apiGet<{ assets: GeneratedAsset[] }>(`/api/tools/${toolId}/assets`);
+export const getAsset = (id: string) =>
+  apiGet<{ asset: GeneratedAsset }>(`/api/assets/${id}`);
+export const generateToolPage = (toolId: string) =>
+  apiPost<{ asset: GeneratedAsset }>(`/api/tools/${toolId}/generate/tool-page`, {});
+export const generateCategoryPage = (toolId: string) =>
+  apiPost<{ asset: GeneratedAsset }>(`/api/tools/${toolId}/generate/category-page`, {});
+export const generateComparisonPage = (toolId: string) =>
+  apiPost<{ asset: GeneratedAsset }>(`/api/tools/${toolId}/generate/comparison-page`, {});
+export const generateAll = (toolId: string) =>
+  apiPost<{ assets: GeneratedAsset[] }>(`/api/tools/${toolId}/generate/all`, {});
