@@ -54,6 +54,29 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface ResearchFact {
+  id: string;
+  researchRunId: string;
+  category: string;
+  content: string;
+  sourceUrl: string | null;
+  confidence: number | null;
+  createdAt: string;
+}
+
+export interface ResearchRun {
+  id: string;
+  toolId: string;
+  status: string;
+  model: string | null;
+  notes: string | null;
+  rawPrompt: string | null;
+  rawResponse: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  facts: ResearchFact[];
+}
+
 export const getHealth = () => apiGet<HealthResponse>("/api/health");
 export const getTools = () => apiGet<{ tools: Tool[] }>("/api/tools");
 export const getTool = (id: string) => apiGet<{ tool: Tool }>(`/api/tools/${id}`);
@@ -61,3 +84,7 @@ export const createTool = (body: { name: string; affiliateUrl?: string; notes?: 
   apiPost<{ tool: Tool }>("/api/tools", body);
 export const updateTool = (id: string, body: { name?: string; slug?: string; affiliateUrl?: string | null; notes?: string | null; status?: string }) =>
   apiPatch<{ tool: Tool }>(`/api/tools/${id}`, body);
+export const runResearch = (toolId: string, notes?: string) =>
+  apiPost<{ run: ResearchRun }>(`/api/tools/${toolId}/research`, { notes });
+export const getLatestResearch = (toolId: string) =>
+  apiGet<{ run: ResearchRun | null }>(`/api/tools/${toolId}/research`);

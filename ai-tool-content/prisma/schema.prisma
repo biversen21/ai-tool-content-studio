@@ -36,6 +36,8 @@ model ResearchRun {
   status      String    @default("pending") // ResearchStatus: pending | running | completed | failed
   model       String?
   notes       String?
+  rawPrompt   String?
+  rawResponse String?
   startedAt   DateTime  @default(now())
   completedAt DateTime?
 

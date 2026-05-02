@@ -17,6 +17,8 @@ export const ResearchRunSchema = z.object({
   status: ResearchStatus.default("pending"),
   model: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  rawPrompt: z.string().nullable().optional(),
+  rawResponse: z.string().nullable().optional(),
   startedAt: z.coerce.date(),
   completedAt: z.coerce.date().nullable().optional(),
 });
