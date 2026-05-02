@@ -1,7 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import { createTool, getTools, type Tool } from "./lib/api.js";
+import { Field, inputCls, StatusBadge } from "./ui.js";
+import { ToolDetail } from "./ToolDetail.js";
+
+type View = { page: "dashboard" } | { page: "detail"; toolId: string };
 
 export default function App() {
+  const [view, setView] = useState<View>({ page: "dashboard" });
+
+  if (view.page === "detail") {
+    return (
+      <ToolDetail
+        toolId={view.toolId}
+        onBack={() => setView({ page: "dashboard" })}
+      />
+    );
+  }
+
+  return <Dashboard onSelect={(id) => setView({ page: "detail", toolId: id })} />;
+}
+
+// ---- Dashboard ----
+
+function Dashboard({ onSelect }: { onSelect: (id: string) => void }) {
   const [tools, setTools] = useState<Tool[]>([]);
   const [listStatus, setListStatus] = useState<"loading" | "ok" | "error">("loading");
   const [listError, setListError] = useState("");
@@ -25,7 +46,7 @@ export default function App() {
       <div className="max-w-2xl mx-auto space-y-8">
         <h1 className="text-2xl font-semibold text-slate-900">AI Tool Content Studio</h1>
         <AddToolForm onCreated={loadTools} />
-        <ToolList tools={tools} status={listStatus} error={listError} />
+        <ToolList tools={tools} status={listStatus} error={listError} onSelect={onSelect} />
       </div>
     </main>
   );
@@ -33,11 +54,7 @@ export default function App() {
 
 // ---- Add Tool Form ----
 
-interface AddToolFormProps {
-  onCreated: () => void;
-}
-
-function AddToolForm({ onCreated }: AddToolFormProps) {
+function AddToolForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [notes, setNotes] = useState("");
@@ -75,7 +92,7 @@ function AddToolForm({ onCreated }: AddToolFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Notion AI"
-            className={input}
+            className={inputCls}
           />
         </Field>
         <Field label="Affiliate URL">
@@ -84,7 +101,7 @@ function AddToolForm({ onCreated }: AddToolFormProps) {
             value={affiliateUrl}
             onChange={(e) => setAffiliateUrl(e.target.value)}
             placeholder="https://..."
-            className={input}
+            className={inputCls}
           />
         </Field>
         <Field label="Notes">
@@ -93,7 +110,7 @@ function AddToolForm({ onCreated }: AddToolFormProps) {
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Optional notes…"
-            className={input}
+            className={inputCls}
           />
         </Field>
         {submitStatus === "error" && (
@@ -117,83 +134,52 @@ interface ToolListProps {
   tools: Tool[];
   status: "loading" | "ok" | "error";
   error: string;
+  onSelect: (id: string) => void;
 }
 
-function ToolList({ tools, status, error }: ToolListProps) {
+function ToolList({ tools, status, error, onSelect }: ToolListProps) {
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-900 mb-3">
-        Tools {status === "ok" && tools.length > 0 && (
-          <span className="text-slate-400 font-normal">({tools.length})</span>
+        Tools{status === "ok" && tools.length > 0 && (
+          <span className="text-slate-400 font-normal"> ({tools.length})</span>
         )}
       </h2>
       {status === "loading" && <p className="text-sm text-slate-500">Loading…</p>}
-      {status === "error" && <p className="text-sm text-red-600">{error}</p>}
+      {status === "error"   && <p className="text-sm text-red-600">{error}</p>}
       {status === "ok" && tools.length === 0 && (
         <p className="text-sm text-slate-500">No tools yet. Add one above.</p>
       )}
       {status === "ok" && tools.length > 0 && (
         <ul className="space-y-3">
-          {tools.map((tool) => <ToolRow key={tool.id} tool={tool} />)}
+          {tools.map((tool) => (
+            <ToolRow key={tool.id} tool={tool} onSelect={onSelect} />
+          ))}
         </ul>
       )}
     </section>
   );
 }
 
-function ToolRow({ tool }: { tool: Tool }) {
+function ToolRow({ tool, onSelect }: { tool: Tool; onSelect: (id: string) => void }) {
   return (
-    <li className="bg-white border border-slate-200 rounded-xl px-5 py-4">
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-medium text-slate-900">{tool.name}</span>
-        <StatusBadge status={tool.status} />
-      </div>
-      <p className="text-xs text-slate-400 mt-0.5">{tool.slug}</p>
-      {tool.affiliateUrl && (
-        <a
-          href={tool.affiliateUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-blue-500 hover:underline mt-1 block truncate"
-        >
-          {tool.affiliateUrl}
-        </a>
-      )}
-      {tool.notes && (
-        <p className="text-sm text-slate-600 mt-2">{tool.notes}</p>
-      )}
+    <li>
+      <button
+        onClick={() => onSelect(tool.id)}
+        className="w-full text-left bg-white border border-slate-200 rounded-xl px-5 py-4 hover:border-slate-300 hover:shadow-sm transition-all"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-medium text-slate-900">{tool.name}</span>
+          <StatusBadge status={tool.status} />
+        </div>
+        <p className="text-xs text-slate-400 mt-0.5">{tool.slug}</p>
+        {tool.affiliateUrl && (
+          <p className="text-xs text-blue-500 mt-1 truncate">{tool.affiliateUrl}</p>
+        )}
+        {tool.notes && (
+          <p className="text-sm text-slate-600 mt-2 line-clamp-2">{tool.notes}</p>
+        )}
+      </button>
     </li>
   );
 }
-
-function StatusBadge({ status }: { status: string }) {
-  const colours: Record<string, string> = {
-    draft: "bg-slate-100 text-slate-600",
-    researched: "bg-blue-50 text-blue-700",
-    generated: "bg-violet-50 text-violet-700",
-    approved: "bg-green-50 text-green-700",
-    archived: "bg-amber-50 text-amber-700",
-  };
-  const cls = colours[status] ?? "bg-slate-100 text-slate-600";
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cls}`}>
-      {status}
-    </span>
-  );
-}
-
-// ---- Shared primitives ----
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-const input =
-  "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";
