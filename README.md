@@ -58,8 +58,8 @@ npm install
 # 3. Copy the env template
 cp .env.example .env
 
-# 4. Add your OpenAI API key — open .env and replace the empty value:
-#    OPENAI_API_KEY=sk-your-key-here
+# 4. Add your OpenAI API key — paste this line with your real key substituted
+sed -i.bak 's/OPENAI_API_KEY=/OPENAI_API_KEY=sk-your-key-here/' .env && rm .env.bak
 
 # 5. Create the local SQLite database and generate the Prisma client
 npm run prisma:migrate -- --name init
