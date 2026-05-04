@@ -82,7 +82,7 @@ npm run dev
 | `OPENAI_API_KEY` | — | **Required.** OpenAI API key |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model used for research and generation |
 | `EXPORT_DIR` | `exports` | Root dir for local exports (relative to repo root) |
-| `VITE_API_BASE_URL` | `http://localhost:4000` | Backend URL used by the frontend |
+| `BACKEND_URL` | `http://localhost:4000` | Vite dev proxy target — must match `PORT`. Not embedded in the frontend bundle. |
 
 ## API reference
 
