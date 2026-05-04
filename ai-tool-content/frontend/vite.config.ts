@@ -1,31 +1,41 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({ mode }) => {
-  const envDir = resolve(__dirname, "..");
-  const env = loadEnv(mode, envDir, "");
-  const port = env.PORT ?? "4000";
-  const backendUrl = `http://localhost:${port}`;
-  console.log("[vite.config] __dirname:", __dirname);
-  console.log("[vite.config] envDir:", envDir);
-  console.log("[vite.config] PORT from loadEnv:", env.PORT);
-  console.log("[vite.config] proxy target:", backendUrl);
+function readDotEnv(): Record<string, string> {
+  try {
+    return Object.fromEntries(
+      readFileSync(resolve(__dirname, "../.env"), "utf8")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("#") && l.includes("="))
+        .map((l) => {
+          const i = l.indexOf("=");
+          return [l.slice(0, i).trim(), l.slice(i + 1).replace(/^["']|["']$/g, "").trim()];
+        }),
+    );
+  } catch {
+    return {};
+  }
+}
 
-  return {
-    plugins: [react()],
-    envDir: resolve(__dirname, ".."),
-    server: {
-      port: 5173,
-      proxy: {
-        "/api": {
-          target: backendUrl,
-          changeOrigin: true,
-        },
+const dotenv = readDotEnv();
+const backendUrl = `http://localhost:${dotenv.PORT ?? "4000"}`;
+console.log("[vite.config] proxy target:", backendUrl);
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: backendUrl,
+        changeOrigin: true,
       },
     },
-  };
+  },
 });
