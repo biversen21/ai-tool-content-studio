@@ -29,6 +29,7 @@ export function serializeMarkdown(asset: GeneratedAsset): SerializedExport {
     `createdAt: ${asset.createdAt.toISOString()}`,
     "---",
     "",
+    "",
   ].join("\n");
 
   return {
