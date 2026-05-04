@@ -6,9 +6,14 @@ import { dirname, resolve } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, resolve(__dirname, ".."), "");
+  const envDir = resolve(__dirname, "..");
+  const env = loadEnv(mode, envDir, "");
   const port = env.PORT ?? "4000";
   const backendUrl = `http://localhost:${port}`;
+  console.log("[vite.config] __dirname:", __dirname);
+  console.log("[vite.config] envDir:", envDir);
+  console.log("[vite.config] PORT from loadEnv:", env.PORT);
+  console.log("[vite.config] proxy target:", backendUrl);
 
   return {
     plugins: [react()],
