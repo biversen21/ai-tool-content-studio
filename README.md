@@ -55,14 +55,16 @@ cd ai-tool-content
 # 2. Install all workspaces
 npm install
 
-# 3. Configure environment
+# 3. Copy the env template
 cp .env.example .env
-# Fill in OPENAI_API_KEY — required for research and content generation
 
-# 4. Create the local SQLite database and generate the Prisma client
+# 4. Add your OpenAI API key — open .env and replace the empty value:
+#    OPENAI_API_KEY=sk-your-key-here
+
+# 5. Create the local SQLite database and generate the Prisma client
 npm run prisma:migrate -- --name init
 
-# 5. Start backend (http://localhost:4000) + frontend (http://localhost:5173)
+# 6. Start backend (http://localhost:4000) + frontend (http://localhost:5173)
 npm run dev
 ```
 
