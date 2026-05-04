@@ -7,7 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, ".."), "");
-  const backendUrl = env.BACKEND_URL ?? "http://localhost:4000";
+  const port = env.PORT ?? "4000";
+  const backendUrl = `http://localhost:${port}`;
 
   return {
     plugins: [react()],
